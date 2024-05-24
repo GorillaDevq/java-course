@@ -2,11 +2,14 @@ package com.campus.course.course.controller;
 
 import com.campus.course.course.dto.request.CreateCourseRequest;
 import com.campus.course.course.dto.request.EditCourseRequest;
+import com.campus.course.course.dto.response.CourseFullResponse;
 import com.campus.course.course.dto.response.CourseResponse;
 import com.campus.course.course.entity.CourseEntity;
 import com.campus.course.course.exception.CourseNotFoundException;
 import com.campus.course.course.repository.CourseRepository;
 import com.campus.course.course.routes.CourseRoutes;
+import com.campus.course.lesson.entity.LessonEntity;
+import com.campus.course.lesson.repository.LessonRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Example;
 import org.springframework.data.domain.ExampleMatcher;
@@ -21,22 +24,23 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class CourseApiController {
     private final CourseRepository courseRepository;
+    private final LessonRepository lessonRepository;
 
     @PostMapping(CourseRoutes.CREATE)
-    public CourseResponse create(@RequestBody CreateCourseRequest request) {
+    public CourseFullResponse create(@RequestBody CreateCourseRequest request) {
         CourseEntity entity = courseRepository.save(request.entity());
-        return CourseResponse.of(entity);
+
+        return CourseFullResponse.of(entity, lessonRepository.findByCourseId(entity.getId()));
     }
 
     @GetMapping(CourseRoutes.BY_ID)
-    public CourseResponse findById(@PathVariable long id) throws CourseNotFoundException {
-        return courseRepository.findById(id)
-                .map(CourseResponse::of)
-                .orElseThrow(CourseNotFoundException::new);
+    public CourseFullResponse findById(@PathVariable long id) throws CourseNotFoundException {
+        CourseEntity entity = courseRepository.findById(id).orElseThrow(CourseNotFoundException::new);
+        return CourseFullResponse.of(entity, lessonRepository.findByCourseId(entity.getId()));
     }
 
     @PutMapping(CourseRoutes.EDIT)
-    public CourseResponse edit(@PathVariable long id, @RequestBody EditCourseRequest request) throws CourseNotFoundException {
+    public CourseFullResponse edit(@PathVariable long id, @RequestBody EditCourseRequest request) throws CourseNotFoundException {
         CourseEntity entity = courseRepository.findById(id).orElseThrow(CourseNotFoundException::new);
 
         entity.setTitle(request.getTitle());
@@ -44,13 +48,14 @@ public class CourseApiController {
 
         entity = courseRepository.save(entity);
 
-        return CourseResponse.of(entity);
+        return CourseFullResponse.of(entity, lessonRepository.findByCourseId(entity.getId()));
     }
 
     @DeleteMapping(CourseRoutes.DELETE)
     public String delete(@PathVariable long id){
+        List<LessonEntity> lessons = lessonRepository.findByCourseId(id);
+        for (LessonEntity lesson : lessons) lessonRepository.deleteById(lesson.getId());
         courseRepository.deleteById(id);
-
         return HttpStatus.OK.name();
     }
 
